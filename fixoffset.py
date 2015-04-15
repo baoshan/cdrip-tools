@@ -32,7 +32,7 @@ def process_arguments():
                         help='lossless audio file')
     parser.add_argument('-f', '--format',
                         default='wav',
-                        choices=['wav', 'flac'],
+                        choices=['wav', 'flac', 'aiff'],
                         help='format of generated output file(s)')
 
     utils.add_common_arguments(parser, VERSION)
@@ -68,7 +68,7 @@ def fix_offset(sources, offset, fmt='wav', verbose=False):
         sox_args += ['pad', '%is' % -offset, '0',
                      'trim', '0', '%is' % total_samples]
 
-    splitaudio_args = [BIN['splitaudio'], '1' if fmt == 'flac' else '0']
+    splitaudio_args = [BIN['splitaudio'], '2' if fmt == 'aiff' else '1' if fmt == 'flac' else '0']
 
     for s in sources:
         splitaudio_args += [str(s['num_samples'])]

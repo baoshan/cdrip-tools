@@ -39,7 +39,11 @@ main(int argc, char *argv[])
         out_info.samplerate = 44100;
 
         char filename[14];
-        if (format == 1) {
+        if (format == 2) {
+            sprintf(filename, "fixed%03u.aiff", i);
+            out_info.format = SF_FORMAT_AIFF | SF_FORMAT_PCM_16;
+        }
+        else if (format == 1) {
             sprintf(filename, "fixed%03u.flac", i);
             out_info.format = SF_FORMAT_FLAC | SF_FORMAT_PCM_16;
         } else {
