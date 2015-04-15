@@ -85,7 +85,7 @@ class Track(object):
             m = '%s%s (confidence %s%s)' % \
                 (msg, self.with_offset_fmt % offset if offset else '',
                  '+'.join(str(x) for x in confidence),
-                 '/%i' % ns if ns != confidence else '')
+                 '/%i' % ns if ns != sum(confidence) else '')
             summary.append(m)
             if offset not in album_matches:
                 album_matches[offset] = []
@@ -340,7 +340,9 @@ def print_summary(tracks, verbose=False):
 
     total = len(tracks)
     mfmt = '%i/%i' if total < 10 else '%2i/%2i'
-    for offset in sorted(good.keys(), key=abs):
+    for offset in sorted(good, \
+        key=lambda offset: sum(map(lambda c_ns: sum(c_ns[0]), good[offset])), \
+        reverse=True):
         entry = good[offset]
         n = len(entry)
         c, ns = max(entry, key=lambda x: sum(x[0]))
@@ -348,7 +350,9 @@ def print_summary(tracks, verbose=False):
             (n, total, Track.exact_match_msg, Track.with_offset_fmt % offset
              if offset else '', sum(c))
         print(m)
-    for offset in sorted(maybe.keys()):
+    for offset in sorted(maybe, \
+        key=lambda offset: sum(map(lambda c_ns: sum(c_ns[0]), maybe[offset])), \
+        reverse=True):
         entry = maybe[offset]
         n = len(entry)
         c, ns = max(entry, key=lambda x: sum(x[0]))
