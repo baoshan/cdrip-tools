@@ -99,6 +99,11 @@ def add_common_arguments(parser, version):
                         action='store_true',
                         default=False,
                         )
+    parser.add_argument("-c", "--concise",
+                        help="enable concise output",
+                        action='store_true',
+                        default=False,
+                        )
     parser.add_argument('--version', action='version', version='%%(prog)s %s' %
                         version)
     parser.add_argument("-w", "--wait",

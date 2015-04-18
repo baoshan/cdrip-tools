@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import struct
+import ntpath
 from argparse import ArgumentParser
 from io import BytesIO
 from tempfile import TemporaryFile
@@ -51,12 +52,12 @@ class AccurateripEntry(object):
 
 class Track(object):
     """One track and its associated metadata/information"""
-    exact_match_msg = 'Accurately ripped'
-    possible_match_msg = 'Possibly accurately ripped'
-    not_present_msg = 'Not present in database'
+    exact_match_msg = 'A'
+    possible_match_msg = 'P'
+    not_present_msg = 'M'
 
-    not_accurate_fmt = '***Definitely not accurately ripped (%s)***'
-    with_offset_fmt = ' with offset %i'
+    not_accurate_fmt = 'B'
+    with_offset_fmt = '%i'
     _fmt = '%-20s: %08X'
     total_fmt = 'total %i submissions'
 
@@ -82,10 +83,10 @@ class Track(object):
         summary = []
         for offset, confidence in iter(matches.items()):
             ns = self.num_submissions
-            m = '%s%s (confidence %s%s)' % \
-                (msg, self.with_offset_fmt % offset if offset else '',
-                 '+'.join(str(x) for x in confidence),
-                 '/%i' % ns if ns != sum(confidence) else '')
+            m = '%s %s %s %s' % \
+                (msg, offset,
+                 sum(confidence), # '+'.join(str(x) for x in confidence),
+                 ns)
             summary.append(m)
             if offset not in album_matches:
                 album_matches[offset] = []
@@ -327,44 +328,42 @@ def print_summary(tracks, verbose=False):
     np = []        # No accuraterip data at all
 
     for track in tracks:
-        lines = [track.path]
-        lines += track.calcsummary(verbose)
+        lines = [ntpath.basename(track.path).split('.')[0]]
         if verbose:
             lines += track.dbsummary()
-        lines.append('-'*len(lines[-1]))
-        lines += track.ripsummary(good, maybe, np, bad)
-        summary.append('\n    '.join(lines))
+        lines += [track.ripsummary(good, maybe, np, bad)[0]]
+        summary.append(' '.join(lines))
 
-    print('\n\n'.join(summary))
-    print('\n'+'='*80)
+    print('\n'.join(summary))
+    print('='*20)
 
     total = len(tracks)
     mfmt = '%i/%i' if total < 10 else '%2i/%2i'
+    conclusion = []
     for offset in sorted(good, \
         key=lambda offset: sum(map(lambda c_ns: sum(c_ns[0]), good[offset])), \
         reverse=True):
         entry = good[offset]
         n = len(entry)
         c, ns = max(entry, key=lambda x: sum(x[0]))
-        m = (mfmt+' %s%s (confidence %i)') % \
-            (n, total, Track.exact_match_msg, Track.with_offset_fmt % offset
-             if offset else '', sum(c))
-        print(m)
+        m = (mfmt+' %s %s %i %s') % \
+            (n, total, Track.exact_match_msg, offset, sum(c), ns)
+        conclusion.append(m)
     for offset in sorted(maybe, \
         key=lambda offset: sum(map(lambda c_ns: sum(c_ns[0]), maybe[offset])), \
         reverse=True):
         entry = maybe[offset]
         n = len(entry)
         c, ns = max(entry, key=lambda x: sum(x[0]))
-        m = (mfmt+' %s%s (confidence %i)') % \
-            (n, total, Track.possible_match_msg, Track.with_offset_fmt % offset
-             if offset else '', sum(c))
-        print(m)
+        m = (mfmt+' %s %s %i %s') % \
+            (n, total, Track.possible_match_msg, offset, sum(c), ns)
+        conclusion.append(m)
     if bad:
-        print((mfmt+' %s') % (len(bad), total, Track.not_accurate_msg))
+        conclusion.append((mfmt+' %s') % (len(bad), total, Track.not_accurate_msg))
     if np:
-        print((mfmt+' %s') % (len(np), total, Track.not_present_msg))
+        conclusion.append((mfmt+' %s') % (len(np), total, Track.not_present_msg))
 
+    print(conclusion[0])
     return len(bad)
 
 def main(options):
@@ -373,7 +372,7 @@ def main(options):
 
     cddb, id1, id2 = get_disc_ids(tracks, options.additional_sectors,
                                   options.data_track_len, options.verbose)
-    print('Disc ID: %08x-%08x-%08x' % (id1, id2, cddb))
+    print('%08x-%08x-%08x' % (id1, id2, cddb))
     get_ar_entries(cddb, id1, id2, tracks, options.verbose)
     scan_files(tracks)
     return print_summary(tracks, options.verbose)
