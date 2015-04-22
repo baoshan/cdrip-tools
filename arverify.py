@@ -372,8 +372,8 @@ def print_summary(tracks):
             track.crc450
         ])
         if offset: info.append(
-            'A' if track.exact_matches[offset[0]] else
-            'P' if track.possible_matches[offset[0]] else
+            'A' if track.exact_matches.has_key(offset[0]) else
+            'P' if track.possible_matches.has_key(offset[0]) else
             'N' if track.num_submissions == 0 else
             'B')
         print(' '.join(info))
