@@ -37,33 +37,22 @@ PROCS = []
 
 MIN_OFFSET = -2939
 
+
+# ## Accuraterip Entry
 class AccurateripEntry(object):
     """Represents one entry in Accuraterip database. One track
     may have several entries in the database
-
-    TODO: See if there's a way to determine if crc is v1 or v2 beforehand
     """
-    _fmt = '%-20s: CRC: %08X, Confidence: %3i, CRC450: %08X'
 
     def __init__(self, crc, crc450, confidence):
         self.crc = crc
         self.crc450 = crc450
         self.confidence = confidence
 
-    def __str__(self):
-        return self._fmt % ('Database entry', self.crc, self.confidence,
-                            self.crc450)
 
+# ## Track
 class Track(object):
     """One track and its associated metadata/information"""
-    exact_match_msg = 'A'
-    possible_match_msg = 'P'
-    not_present_msg = 'M'
-
-    not_accurate_fmt = 'B'
-    with_offset_fmt = '%i'
-    _fmt = '%-20s: %08X'
-    total_fmt = 'total %i submissions'
 
     def __init__(self, path):
         self.path = path
@@ -83,54 +72,34 @@ class Track(object):
     def num_submissions(self):
         return sum([e.confidence for e in self.ar_entries])
 
-    def __matches_summary(self, matches, msg, album_matches):
-        summary = []
+    def __matches_summary(self, matches, album_matches):
+        total = 0
 
-        for offset in sorted(matches, key=lambda offset: matches[offset], reverse=True):
+        for offset in sorted(matches):
             confidence = matches[offset]
             ns = self.num_submissions
-            m = ' '.join([msg, str(offset).rjust(5), str(confidence).rjust(3), str(ns).rjust(3)])
-            summary.append(m)
+            total += 1
             if offset not in album_matches:
                 album_matches[offset] = []
             album_matches[offset].append((confidence, ns))
-        return summary
-
-    def calcsummary(self):
-        return ' '.join(map((lambda crc: '%08X' % crc), [self.crc1, \
-                                                          self.crc2, \
-                                                          self.crc450]))
-
-    def dbsummary(self):
-        return [str(e) for e in self.ar_entries]
-
+        return total
 
     def ripsummary(self, album_exact_matches, album_possible_matches, album_not_present, album_not_accurate):
 
-        good = self.__matches_summary(self.exact_matches, 'A', album_exact_matches)
-        possible = self.__matches_summary(self.possible_matches, 'P', album_possible_matches)
+        good = self.__matches_summary(self.exact_matches, album_exact_matches)
+        possible = self.__matches_summary(self.possible_matches, album_possible_matches)
         summary = good + possible
 
         ns = self.num_submissions
 
         # When there's no submission for the disc id, the rip is considered not present (missing);
         if ns == 0:
-            summary.append('M')
             album_not_present.append(0)
 
         # When no match, the rip is considered to be a bad rip.
         elif not good and not possible:
-            summary.append('B')
             album_not_accurate.append(ns)
 
-        return summary
-
-
-    def conclusion(self, offset):
-        if self.exact_matches[offset]: return 'A' + str(sum(self.exact_matches[offset]))
-        elif self.possible_matches[offset]: return 'P'
-        elif self.num_submissions == 0: return 'M'
-        else: return 'B'
 
 # ## Process Arguments
 def process_arguments():
@@ -145,15 +114,14 @@ def process_arguments():
                         help="additional pregap sectors beyond standard 150",
                         default=0,
                         )
-    parser.add_argument("-d", "--data-track-length", dest="data_track_len",
-                        help="length of data track in sectors or mm:ss.ff",
-                        default=0,
-                        )
     utils.add_common_arguments(parser, VERSION)
 
     return parser.parse_args()
 
 
+# ## Scan Files
+#
+# Untouched.
 def scan_files(tracks):
     sox_args = ['sox']+[t.path for t in tracks]+['-t', 'raw', '-']
     entries_per_track = max([len(t.ar_entries) for t in tracks])
@@ -184,8 +152,7 @@ def scan_files(tracks):
     out = tmp.read().decode()
     for pr in PROCS:
         if pr.returncode:
-            raise SubprocessError('sox had an error (returned %i)' %
-                                  pr.returncode)
+            raise SubprocessError('sox had an error (returned %i)' % pr.returncode)
 
     lines = out.split('\n')
     num_lines = len(lines)
@@ -226,6 +193,8 @@ def scan_files(tracks):
 
 
 # ## Calculate Disc IDs
+#
+# Untouched.
 #
 # 1. Handle data track;
 # 2. Handle sectors before first track;
@@ -277,6 +246,8 @@ def get_disc_ids(tracks, additional_sectors=0, data_track_len=0):
 
 # ## Fetch AccurateRip Entries
 #
+# Untouched.
+#
 # 1. Generate URL;
 # 2. Handle `404`;
 # 3. Parse binary accuraterip data.
@@ -296,6 +267,7 @@ def get_ar_entries(cddb, id1, id2, tracks):
 # ## Parse Binary AccurateRip Data
 #
 # Untouched.
+#
 # [See](https://forum.dbpoweramp.com/showthread.php?20641)
 def process_binary_ar_entries(fdata, cddb, id1, id2, tracks):
     if not fdata:
@@ -354,7 +326,7 @@ def print_summary(tracks):
     for track in tracks:
         track.ripsummary(good, maybe, np, bad)
 
-    total = len(tracks)
+    trackcount = len(tracks)
     offset = []
 
     # Output good / maybe conclusion line.
@@ -364,20 +336,20 @@ def print_summary(tracks):
             y = offsets[y]
             len_diff = len(y) - len(x)
             if len_diff: return len_diff
-            elif sum(map(lambda c_ns: c_ns[0], x)) < sum(map(lambda c_ns: c_ns[0], y)): return 1
+            elif sum([entry[0] for entry in x]) < sum([entry[0] for entry in y]): return 1
             else: return -1
         offset[:] = [sorted(offsets, cmp=cmp)[0]]
         entries = offsets[offset[0]]
         num_matches = len(entries)
         confidence, num_submissions = max(entries, key=lambda entry: entry[0])
-        return '%i/%i %s %i %i %i' % (num_matches, total, 'A', offset[0], confidence, num_submissions)
+        return '%i/%i %s %i %i %i' % (num_matches, trackcount, category, offset[0], confidence, num_submissions)
 
     # Output one line conclusion.
     disc_conclusion = (
       conclusion('A', good) if good else
       conclusion('P', maybe) if maybe else
-      '%i/%i M' % (len(np), total) if np else
-      '%i/%i B' % (len(bad), total))
+      '%i/%i N' % (len(np), trackcount) if np else
+      '%i/%i B' % (len(bad), trackcount))
 
     # Output track info:
     #
@@ -412,8 +384,6 @@ def print_summary(tracks):
     # Output disc conclusion
     print(disc_conclusion)
 
-    return 0
-
 
 # ## Main
 #
@@ -431,7 +401,7 @@ def main(options):
     print('%08x-%08x-%08x %i' % (id1, id2, cddb, options.additional_sectors))
     get_ar_entries(cddb, id1, id2, tracks)
     scan_files(tracks)
-    return print_summary(tracks)
+    print_summary(tracks)
 
 
 if __name__ == '__main__':
