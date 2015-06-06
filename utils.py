@@ -157,7 +157,7 @@ def execute(main, process_arguments, processes, tempfiles=[], tempdirs=[]):
     except (DependencyError, AccurateripError, SubprocessError,
             NotFromCDError, NetworkError) as e:
         print(e, file=sys.stderr)
-        sys.stderr.write('%s\n' % e)
+        # sys.stderr.write('%s\n' % e)
         exitcode = 2
     finally:
         for t in tempfiles:

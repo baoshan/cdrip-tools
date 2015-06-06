@@ -59,7 +59,7 @@ class Track(object):
         self.num_samples = utils.get_num_samples(BIN, path)
         self.num_sectors = int(self.num_samples/588)
         if self.num_samples % 588 != 0:
-            msg = "%s not from CD (%i samples)\n" % \
+            msg = "%s not from CD (%i samples)" % \
                 (path, self.num_samples)
             raise NotFromCDError(msg)
         self.ar_entries = []
